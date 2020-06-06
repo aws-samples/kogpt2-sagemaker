@@ -134,9 +134,9 @@ $ aws ecr create-repository --repository-name kogpt2 --region us-west-2
 리포지토리 이름을 사용해서 이미지에 새로운 태그를 부여합니다. `docker image` 명령으로 컨테이너 이미지 ID를 얻은 후, `docker tag` 명령을 해당 이미지 ID와 리포지토리 URI를 적용해서 수행합니다. 위 create-repository에서 나온 `repositoryUri`를 사용하면 됩니다. 
 
 ```json
-[...]
+...
         "repositoryUri": "12345678.dkr.ecr.us-west-2.amazonaws.com/kogpt2",
-[...]
+...
 ```
 
 ```bash
@@ -183,7 +183,7 @@ $ aws ecr list-images --repository-name kogpt2
 
 여러분의 자연어처리(NLP, Natual Language Processing) 문제를 해결하기 위해서 KoGPT2 pre-trained 모델을 fine-tuning을 수행할 수 있지만, 여기서는 간단하게 pre-trained KoGPT2 모델을 Amazon SageMaker에 배포해서 문장을 완성하는 예제를 사용하겠습니다.
 
-우선  [KoGPT2 git repository](https://github.com/SKT-AI/KoGPT2) 에 있는 예제를 수행한 후, `~/kogpt2` 디렉토리에 2개 파일이 생성된 것을 확인합니다. 하나는 Apache MXNet 모델 파라메터 파일이고, 다른 하나는 sentencepiece 단어 파일입니다. 이 두 파일을 .tar.gz으로 묶어서 여러분의 Amazon S3 버킷에 올립니다.
+우선  [KoGPT2 git repository](https://github.com/SKT-AI/KoGPT2) 를 clone한다음 에 있는 예제를 수행한 후, `~/kogpt2` 디렉토리에 2개 파일이 생성된 것을 확인합니다. 하나는 Apache MXNet 모델 파라메터 파일이고, 다른 하나는 sentencepiece 단어 파일입니다. 이 두 파일을 .tar.gz으로 묶어서 여러분의 Amazon S3 버킷에 올립니다.
 
 ```bash
 $ cd ~/kogpt2
