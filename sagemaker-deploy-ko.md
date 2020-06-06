@@ -166,8 +166,9 @@ $ docker push 12345678.dkr.ecr.us-west-2.amazonaws.com/kogpt2
 latest: digest: sha256:66bc1759a4d2e94daff4dd02446024a11c5af29d9259175f11701a0b9ee2d2d1 size: 4934
 ```
 
-그런다음 `aws ecr list-images` 명령으로 이미지가 잘 올라갔는지 확인합니다.
 
+그런다음 `aws ecr list-images` 명령으로 이미지가 잘 올라갔는지 확인합니다.
+```bash
 $ aws ecr list-images --repository-name kogpt2
 {
     "imageIds": [
