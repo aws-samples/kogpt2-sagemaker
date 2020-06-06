@@ -8,6 +8,9 @@
 
 ## 1단계: MXNet inference 컨테이너 확장하기
 
+### EC2 사용하기 (option) ### 
+컨테이너를 빌드할 (GPU)서버가 없다면 EC2 GPU 를 사용하고, AMI는 Deep Learning AMI (Ubuntu 18.04) 등을 사용하면 됩니다. 
+
 ### 컨테이너 Git repository 복제하기
 
 우선 MXNet serving 컨테이너의 git repository를 복제합니다. docker가 설치되어 있는 곳에서 수행해야하며, GPU는 필요하지 않습니다. Amazon EC2 인스턴스 또는 Amazon SageMaker의 노트북 인스턴스에서 수행하는 것을 추천합니다.
@@ -84,19 +87,57 @@ $ docker exec -it <container name> /bin/bash
 이제 우리는 KoGPT2 패키지가 설치된 컨테이너 이미지를 Amazon Elastic Container Registry(ECR)에 등록할 준비가 되었습니다. Amazon SageMaker에서 Amazon ECR에 등록된 이미지를 사용할 예정입니다. 자세한 내용은 Amazon ECR 문서의  “[Pushing an Image](https://docs.aws.amazon.com/AmazonECR/latest/userguide/docker-push-ecr-image.html)”를 참조해주세요. 간단히 설명하자면, 네 단계를 따르면 됩니다. 첫번째 단계는, docker를 Amazon ECR 레지스트리에 인증하는 것입니다. `get-login-password` 명령을 사용합니다. AWS CLI 1.17.0 또는 이전 버전을 사용하는 경우, `docker login` 명령을 얻기 위해서 아래 명령을 수행합니다. 만약 AWS CLI 1.17.0 보다 높은 버전을 사용하는 경우에는 “[Using an Authorization Token](https://docs.aws.amazon.com/AmazonECR/latest/userguide/Registries.html#registry_auth)”  참고하세요. 아래 명령 수행 결과를 복사해서 수행하면 docker가 인증을 받습니다.
 
 ```bash
-$ aws ecr get-login --region <AWS region name> --no-include-email
+$ aws ecr get-login --no-include-email --region <AWS region name> 
 ```
+그럼 대략 아래와 같은 명령어를 출력합니다.
+```bash
+docker login -u AWS -p h3YlFJQkFEQm9CZ2...NX0= https://294038372338.dkr.ecr.us-west-2.amazonaws.com
+```
+이 명령어를 복사해 실행 시킵니다. 그럼 아래와 같이 성공적으로 login 했다는 정보를 볼수 있습니다.
+
+```bash
+...
+Configure a credential helper to remove this warning. See
+https://docs.docker.com/engine/reference/commandline/login/#credentials-store
+
+Login Succeeded 
+```
+
 
 ### Amazon ECR 리포지토리 만들기
 
-두 번째로 해야 할 일은 Amazon ECR 리포지토리를 만드는 것입니다. AWS 콘솔을 이용하거나 AWS CLI를 이용할 수 있는데, 여기서는 AWS CLI를 이용하겠습니다. 사용할 명령은 `aws ecr create-repository` 입니다. 만약 이미 만들어져 있는 리포지토리를 사용할 예정이면 다음 단계로 넘어가세요. 리포지토리 이름은 `kogpt2` 라고 하고, 서울 리전을 사용하기 위해서 <AWS region name>에 `ap-northeast-2` 으로 지정하세요.
+두 번째로 해야 할 일은 Amazon ECR 리포지토리를 만드는 것입니다. AWS 콘솔을 이용하거나 AWS CLI를 이용할 수 있는데, 여기서는 AWS CLI를 이용하겠습니다. 사용할 명령은 `aws ecr create-repository` 입니다. 만약 이미 만들어져 있는 리포지토리를 사용할 예정이면 다음 단계로 넘어가세요. 
 
 ```bash
 $ aws ecr create-repository --repository-name <repository name> --region <AWS region name>
 ```
+예로 리포지토리 이름은 `kogpt2` 라고 하고, 서울 리전을 사용하기 위해서 `<AWS region name>`에 `us-west-2` 으로 지정하세요.
+
+```bash
+$ aws ecr create-repository --repository-name kogpt2 --region us-west-2
+```
+
+그럼 아래와 같은 출력을 볼수 있습니다.
+```json
+{
+    "repository": {
+        "repositoryArn": "arn:aws:ecr:us-west-2:12345678:repository/kogpt2",
+        "registryId": "12345678",
+        "repositoryName": "kogpt2",
+        "repositoryUri": "12345678.dkr.ecr.us-west-2.amazonaws.com/kogpt2",
+        "createdAt": 1591436054.0
+    }
+}
+```
 ### 이미지에 새로운 태그를 부여하기
 
-리포지토리 이름을 사용해서 이미지에 새로운 태그를 부여합니다. `docker image` 명령으로 컨테이너 이미지 ID를 얻은 후, `docker tag` 명령을 해당 이미지 ID와 리포지토리 URI를 적용해서 수행합니다. 아래 명령에서 `AWS account ID`, `AWS region`, 그리고 `repository name` 을 적당하게 바꾸는 것을 잊지마세요.
+리포지토리 이름을 사용해서 이미지에 새로운 태그를 부여합니다. `docker image` 명령으로 컨테이너 이미지 ID를 얻은 후, `docker tag` 명령을 해당 이미지 ID와 리포지토리 URI를 적용해서 수행합니다. 위 create-repository에서 나온 `repositoryUri`를 사용하면 됩니다. 
+
+```json
+...
+        "repositoryUri": "12345678.dkr.ecr.us-west-2.amazonaws.com/kogpt2",
+...
+```
 
 ```bash
 $ docker images
@@ -104,23 +145,31 @@ REPOSITORY              TAG                               IMAGE ID            CR
 preprod-mxnet-serving   1.6.0-gpu-py3                     698f5cefa0cf        5 hours ago         6.56GB
 nvidia/cuda             10.1-cudnn7-runtime-ubuntu16.04   e11e11484e2e        3 months ago        1.71GB
 
-$ docker tag <image id> <AWS account ID>.dkr.ecr.<AWS region>.amazonaws.com/<repository name>
+$ docker tag <image id> 12345678.dkr.ecr.us-west-2.amazonaws.com/kogpt2
 
 $ docker images
 REPOSITORY                                            TAG                               IMAGE ID            CREATED             SIZE
 preprod-mxnet-serving                                 1.6.0-gpu-py3                     0012f8ebdcab        2 minutes ago       6.56GB
-<AWS account ID>.dkr.ecr.<AWS region>.amazonaws.com/kogpt2   latest                            0012f8ebdcab        2 minutes ago       6.56GB
+12345678.dkr.ecr.us-west-2.amazonaws.com/kogpt2   latest                            0012f8ebdcab        2 minutes ago       6.56GB
 nvidia/cuda                                           10.1-cudnn7-runtime-ubuntu16.04   e11e11484e2e        3 months ago        1.71GB
 ```
 
 ### Amazon ECR 리포지토리에 이미지 올리기
 
-마지막 단계로 이미지를 Amazon ECR 리포지토리에 올리면 됩니다. `docker image` 명령 수행 결과로 얻은 리포지토리 이름을 사용합니다. 이미지를 올린 후, `aws ecr list-images` 명령으로 이미지가 잘 올라갔는지 확인합니다.
+마지막 단계로 이미지를 Amazon ECR 리포지토리에 올리면 됩니다. `docker image` 명령 수행 결과로 얻은 리포지토리 이름을 사용합니다. 
 
 ```bash
-$ docker push <AWS acconut ID>.dkr.ecr.<AWS region>.amazonaws.com/<repository name>
+$ docker push 12345678.dkr.ecr.us-west-2.amazonaws.com/kogpt2
 
-$ aws ecr list-images --repository-name <repository name>
+1232d7d696f8: Pushed
+...
+latest: digest: sha256:66bc1759a4d2e94daff4dd02446024a11c5af29d9259175f11701a0b9ee2d2d1 size: 4934
+```
+
+
+그런다음 `aws ecr list-images` 명령으로 이미지가 잘 올라갔는지 확인합니다.
+```bash
+$ aws ecr list-images --repository-name kogpt2
 {
     "imageIds": [
         {
@@ -135,7 +184,7 @@ $ aws ecr list-images --repository-name <repository name>
 
 여러분의 자연어처리(NLP, Natual Language Processing) 문제를 해결하기 위해서 KoGPT2 pre-trained 모델을 fine-tuning을 수행할 수 있지만, 여기서는 간단하게 pre-trained KoGPT2 모델을 Amazon SageMaker에 배포해서 문장을 완성하는 예제를 사용하겠습니다.
 
-우선  [KoGPT2 git repository](https://github.com/SKT-AI/KoGPT2) 에 있는 예제를 수행한 후, `~/kogpt2` 디렉토리에 2개 파일이 생성된 것을 확인합니다. 하나는 Apache MXNet 모델 파라메터 파일이고, 다른 하나는 sentencepiece 단어 파일입니다. 이 두 파일을 .tar.gz으로 묶어서 여러분의 Amazon S3 버킷에 올립니다.
+우선  [KoGPT2 git repository](https://github.com/SKT-AI/KoGPT2) 를 clone한다음 에 있는 예제를 수행한 후, `~/kogpt2` 디렉토리에 2개 파일이 생성된 것을 확인합니다. 하나는 Apache MXNet 모델 파라메터 파일이고, 다른 하나는 sentencepiece 단어 파일입니다. 이 두 파일을 .tar.gz으로 묶어서 여러분의 Amazon S3 버킷에 올립니다.
 
 ```bash
 $ cd ~/kogpt2
